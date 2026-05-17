@@ -13,9 +13,7 @@ ALWAYS:
 
 VirtualBox configurations
 
-I.Windows
-
-1.Recommended Architecture
+Recommended Architecture
 
 	Host Machine
 	│
@@ -23,7 +21,9 @@ I.Windows
 	│   ├── Windows 10 VM (Analysis)
 	│   └── Kali Linux VM (Tools/Scripts)
 
-2.Recommended Specs
+I.Windows VM
+
+1.Recommended Specs
 
 	Component	Recommendation
 	RAM:	4–8 GB
@@ -31,7 +31,7 @@ I.Windows
 	Disk:	60 GB
 	OS:	Windows 10 x64
 
-3.Important Security Configuration:
+2.Important Security Configuration:
 Disable Network (VERY IMPORTANT)
 
 Inside VirtualBox:
@@ -45,7 +45,7 @@ OR use:
 
 Never allow malware internet access during testing.
 
-4.Disable Shared Features
+3.Disable Shared Features
 
 Turn OFF:
 
@@ -53,7 +53,7 @@ Turn OFF:
 	Drag and drop
 	Shared folders
 
-5.Create Snapshots
+4.Create Snapshots
 
 After Windows installation:
 
@@ -64,3 +64,29 @@ Snapshot name:
 	Clean Windows
 
 This allows instant recovery after malware execution.
+
+II.Kali Linux VM
+
+Download on kali.org
+
+III.Tools
+
+1.Kali Linux
+
+	Python scripting
+	PE parsing
+	Disassembly
+	YARA
+	Reverse engineering
+
+2.Windows
+
+| Tool                 | Purpose                 |
+| -------------------- | ----------------------- |
+| PEStudio             | PE static analysis      |
+| Detect It Easy (DIE) | Detect packers/compiler |
+| Process Monitor      | Runtime monitoring      |
+| Process Explorer     | Process inspection      |
+| x64dbg               | Debugging               |
+| Wireshark            | Network capture         |
+| Strings              | Extract strings         |
