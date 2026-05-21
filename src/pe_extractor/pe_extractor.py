@@ -1,14 +1,3 @@
-"""
-pe_extractor.py
-Trích xuất đặc trưng PE để phân tích và phát hiện hành vi mã độc.
-
-Tuần 2 — Malware Analysis Project
-Cách dùng:
-    python pe_extractor.py                   # Chạy batch toàn bộ dataset
-    python pe_extractor.py --file sample.exe # Phân tích 1 file
-    python pe_extractor.py --help
-"""
-
 import argparse
 import hashlib
 import json
@@ -21,7 +10,7 @@ from datetime import datetime
 
 import pefile
 
-# CONFIG — Chỉnh ở đây, không cần sửa phần còn lại
+# CONFIG 
  
 CONFIG = {
     "dataset": {
@@ -389,10 +378,6 @@ def extract_iat_features(pe: pefile.PE) -> dict:
 # MODULE 5 — Packer Detection
  
 def detect_packer(section_features: dict, iat_features: dict) -> dict:
-    """
-    Tổng hợp heuristic để kết luận file có bị pack không.
-    Mỗi dấu hiệu cộng điểm một lần — tránh double-counting.
-    """
     cfg      = CONFIG["thresholds"]
     scoring  = CONFIG["scoring"]
     score    = 0
@@ -402,7 +387,6 @@ def detect_packer(section_features: dict, iat_features: dict) -> dict:
     susp_flags     = section_features.get("suspicious_section_flags", [])
     ep_section     = section_features.get("entry_point_section", "").lower()
 
-    # ── Cờ theo từng loại — mỗi loại chỉ cộng điểm 1 lần ──
 
     # 1. Entropy cao
     high_entropy_done = False
@@ -459,13 +443,9 @@ def detect_packer(section_features: dict, iat_features: dict) -> dict:
 
 
  
-# CORE — Phân tích một file PE
+# CORE — Phân tích file PE
  
 def analyze_pe_file(filepath: str) -> dict | None:
-    """
-    Phân tích một file PE, trả về dict đầy đủ đặc trưng.
-    Trả về None nếu file không hợp lệ.
-    """
     if not os.path.isfile(filepath):
         logger.warning(f"File không tồn tại: {filepath}")
         return None
@@ -636,7 +616,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # ── Mode 1: Phân tích 1 file ──
+    #  Mode 1: Phân tích 1 file 
     if args.file:
         logger.info(f"Phân tích file: {args.file}")
         result = analyze_pe_file(args.file)
@@ -655,7 +635,7 @@ def main():
             logger.info(f"Đã lưu kết quả ra: {args.out}")
         return
 
-    # ── Mode 2: Batch toàn bộ dataset ──
+    #  Mode 2: Batch toàn bộ dataset 
     logger.info("=== BATCH MODE ===")
 
     all_stats = []
