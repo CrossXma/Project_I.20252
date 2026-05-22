@@ -22,10 +22,15 @@ Save the result into a specific file path
  --out [PATH]
 ```
 
-Malware/Benign directory
+Scan malware/Benign directory
 ```
  --malware-dir [DIRECTORY]
  --benign-dir [DIRECTORY]
+```
+
+Scan random directory
+```
+--dir [DIRECTORY]
 ```
 
 Help
