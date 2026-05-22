@@ -452,7 +452,6 @@ def parse_args():
     parser.add_argument("--out", metavar="PATH",
                         help="Lưu kết quả ra file JSON (chỉ dùng chung với --file)")
     
-    # Đã bỏ đi default=... để script có thể nhận biết người dùng có nhập tham số hay không
     parser.add_argument("--dir", metavar="DIR",
                         help="Thư mục chứa các file hỗn hợp (gán label 'unknown')")
     parser.add_argument("--malware-dir", metavar="DIR",
@@ -474,7 +473,6 @@ def main():
             logger.error("Không thể phân tích file này.")
             sys.exit(1)
 
-        # Phân tích file riêng lẻ thì không gán label cụ thể
         result["label"] = "unknown"
 
         output = json.dumps(result, indent=2, ensure_ascii=False)
