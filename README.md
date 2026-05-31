@@ -1,92 +1,130 @@
-# Project_I.20252
-Safety Rules
 
-NEVER:
-	Execute on host machine,
-  Enable internet,
-  Double-click unknown samples
+# PE Extractor
 
-ALWAYS:
-  Use password-protected ZIPs,
-  Store in isolated VM,
-  Keep snapshots
 
-VirtualBox configurations
 
-Recommended Architecture
 
-	Host Machine
-	│
-	├── VirtualBox
-	│   ├── Windows 10 VM (Analysis)
-	│   └── Kali Linux VM (Tools/Scripts)
 
-I.Windows VM
 
-1.Recommended Specs
+## File Structure
 
-	Component	Recommendation
-	RAM:	4–8 GB
-	CPU:	2 cores
-	Disk:	60 GB
-	OS:	Windows 10 x64
+```
 
-2.Important Security Configuration:
-Disable Network (VERY IMPORTANT)
+ROOT\                      ←  Root directory of the project (E.g: D:\Documents\Project_1)
+│
+├── output
+|   ├── malware_index.json           ← Created by rebuild_index.py
+|   ├── results.json                 ← Created by pipeline.py
+│
+├── dataset
+|   ├── malware\                     ← UNZIPED .exe files  
+    |   ├── ransomware\
+    │   |   ├── 789xyz...exe
+    │   |   └── ...
+    |   |
+    |   ├── trojan\                      
+    |   |   ├── abc123...exe
+    |   |   └── ...
+    |   |
+    |   ├── botnet\                 
+    |   |   ├── abc123...exe
+    |   |   └── ...
+    |   |
+    |   ├── rat\ 
+    |   |   └── ...
+    |   |
+    |   ├── rootkit\ 
+    |   |   └── ...
+    |   |
+    |   ├── spyware\ 
+    |   |
+    |   |   └── ...
+    |   |
+    |   ├── worm\ 
+    |   |   └── ...
+    |   |
+    ├── benign\                         ← Benign files from System32
+    |   ├── .exe
+|   |   └── .dll
+|   |                    
+|── src\                                ← SOURCECODE
+        ├──pe_extractor
+        |   ├── headers.py
+        |   ├── sections.py
+        |   ├── entropy.py
+        |   ├── iat.py
+        |   ├── packer.py
+        |   ├── pipeline.py             ← File-to-run
+        |
+        └── rebuild_index.py            ← File-to-run
+```
 
-Inside VirtualBox:
 
-	Settings → Network
-	Disable Adapter
+## Requirements
 
-OR use:
+- Enviroment: Window 10 VM (VirtualBox/VMWare)
+- Detect It Easy (DIE) has already added to PATH
 
-	Host-only Adapter
+#### Open ```powershell``` as ```Administrator```, TURN OFF Window Defender
 
-Never allow malware internet access during testing.
+```
+Set-MpPreference -DisableRealtimeMonitoring $true
+Set-MpPreference -DisableBehaviorMonitoring $true
+Set-MpPreference -DisableBlockAtFirstSeen $true
+Set-MpPreference -DisableIOAVProtection $true
+Set-MpPreference -DisablePrivacyMode $true
+Set-MpPreference -SignatureDisableUpdateOnStartupWithoutEngine $true
+Set-MpPreference -DisableArchiveScanning $true
+Set-MpPreference -DisableIntrusionPreventionSystem $true
+Set-MpPreference -DisableScriptScanning $true
+Set-MpPreference -SubmitSamplesConsent NeverSend
+```
+Confirmation
+```
+Get-MpPreference | Select-Object DisableRealtimeMonitoring DisableBehaviorMonitoring, DisableIOAVProtection
+```
 
-3.Disable Shared Features
+The results displayed must be ```True```
 
-Turn OFF:
+#### Add exclusion path
+```
+Add-MpPreference -ExclusionPath [ROOT]
+```
 
-	Shared clipboard
-	Drag and drop
-	Shared folders
+Example
+```
+Add-MpPreference -ExclusionPath "D:\Documents\Project_1"
+```
 
-4.Create Snapshots
+Then restart the computer
+```
+Restart-Computer
+```
 
-After Windows installation:
 
-	Machine → Take Snapshot
 
-Snapshot name:
+## Installation
+#### Run ```rebuild_index.py```, enter the path of your dataset:
+```
+[ROOT]\dataset
+```
 
-	Clean Windows
+Example:
+```
+D:\Documents\Project_1\dataset
+```
 
-This allows instant recovery after malware execution.
+The output is a ```malware_index.json``` file that includes all information of each file saved in ```[ROOT]\output```
 
-II.Kali Linux VM
+------
 
-Download on kali.org
+#### Run ```pipeline.py```, enter the path of your ROOT folder
+```
+[ROOT]
+```
 
-III.Tools
-
-1.Kali Linux
-
-	Python scripting
-	PE parsing
-	Disassembly
-	YARA
-	Reverse engineering
-
-2.Windows
-
-| Tool                 | Purpose                 |
-| -------------------- | ----------------------- |
-| PEStudio             | PE static analysis      |
-| Detect It Easy (DIE) | Detect packers/compiler |
-| Process Monitor      | Runtime monitoring      |
-| Process Explorer     | Process inspection      |
-| x64dbg               | Debugging               |
-| Wireshark            | Network capture         |
-| Strings              | Extract strings         |
+Example
+```
+D:\Documents\Project_1\Project_1\
+```
+The output is a ```results.json``` file that includes all pe header information of each file saved in ```[ROOT]\output``` 
