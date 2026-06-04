@@ -319,12 +319,114 @@ def save_feature_json(
             indent=4
         )
 
+# ============================================================
+# PROCESS ENTIRE DATASET
+# ============================================================
+
+def process_dataset(dataset_root,
+                    feature_root,
+                    asm_root=None):
+
+    for root, dirs, files in os.walk(dataset_root):
+
+        for filename in files:
+
+            filepath = os.path.join(
+                root,
+                filename
+            )
+
+            try:
+
+                relative_path = os.path.relpath(
+                    root,
+                    dataset_root
+                )
+
+                feature_dir = os.path.join(
+                    feature_root,
+                    relative_path
+                )
+
+                os.makedirs(
+                    feature_dir,
+                    exist_ok=True
+                )
+
+                features = extract_asm_features(
+                    filepath
+                )
+
+                json_path = os.path.join(
+                    feature_dir,
+                    f"{filename}.json"
+                )
+
+                with open(
+                    json_path,
+                    "w",
+                    encoding="utf-8"
+                ) as f:
+
+                    json.dump(
+                        features,
+                        f,
+                        indent=4
+                    )
+
+                if asm_root:
+
+                    asm_dir = os.path.join(
+                        asm_root,
+                        relative_path
+                    )
+
+                    os.makedirs(
+                        asm_dir,
+                        exist_ok=True
+                    )
+
+                    asm_path = os.path.join(
+                        asm_dir,
+                        f"{filename}.asm"
+                    )
+
+                    save_disassembly(
+                        filepath,
+                        asm_path
+                    )
+
+                print(
+                    f"[+] {filename}"
+                )
+
+            except Exception as e:
+
+                print(
+                    f"[-] {filename}: {e}"
+                )
 
 # ============================================================
-# TEST
+# ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
+
+    # process_dataset(
+    #     dataset_root="../dataset/malware",
+    #     feature_root="../dataset/features/malware",
+    #     asm_root="../dataset/asm/malware"
+    # )
+
+    # process_dataset(
+    #     dataset_root="../dataset/benign",
+    #     feature_root="../dataset/features/benign",
+    #     asm_root="../dataset/asm/benign"
+    # )
+
+    # ============================================================
+    # TEST
+    # ============================================================
 
     sample = r"sample.exe"
 
