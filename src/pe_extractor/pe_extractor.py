@@ -47,89 +47,140 @@ def extract_pe_info(file_path):
 
     features = {}
     
-    # Ten + Kthc + Hash
-    features["file_info"] = {
-        "file_name": os.path.basename(file_path),
-        "file_size_bytes": os.path.getsize(file_path),
-        **calculate_hashes(file_path)
-    }
+    try:
+        # Ten + Kthc + Hash
+        features["file_info"] = {
+            "file_name": os.path.basename(file_path),
+            "file_size_bytes": os.path.getsize(file_path),
+            **calculate_hashes(file_path)
+        }
+    except Exception as e:
+        return {"error": f"Failed to compute file hashes/info: {e}"}
 
-    
-    pe = pefile.PE(file_path)
-    
-    # Header
-  
-    compile_time = datetime.datetime.fromtimestamp(pe.FILE_HEADER.TimeDateStamp, tz=datetime.timezone.utc).isoformat()
- 
+    try:
+        with pefile.PE(file_path) as pe:
+            # Header
+            try:
+                compile_time = datetime.datetime.fromtimestamp(
+                    pe.FILE_HEADER.TimeDateStamp, tz=datetime.timezone.utc
+                ).isoformat()
+            except (ValueError, OSError, OverflowError):
+                compile_time = f"Invalid timestamp ({pe.FILE_HEADER.TimeDateStamp})"
 
-    features["headers"] = {
-        "machine": pefile.MACHINE_TYPE.get(pe.FILE_HEADER.Machine, f"Unknown ({hex(pe.FILE_HEADER.Machine)})"),
-        "compile_time": compile_time,
-        "entry_point": hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint),
-        "image_base": hex(pe.OPTIONAL_HEADER.ImageBase),
-        "number_of_sections": pe.FILE_HEADER.NumberOfSections,
-        "subsystem": pefile.SUBSYSTEM_TYPE.get(pe.OPTIONAL_HEADER.Subsystem, f"Unknown ({pe.OPTIONAL_HEADER.Subsystem})"),
-        "imphash": pe.get_imphash()  # Hash của bảng import --> nhóm các mẫu mã độc
-    }
+            has_optional = hasattr(pe, 'OPTIONAL_HEADER')
+            entry_point = (
+                hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint)
+                if (has_optional and pe.OPTIONAL_HEADER.AddressOfEntryPoint is not None)
+                else "0x0"
+            )
+            image_base = (
+                hex(pe.OPTIONAL_HEADER.ImageBase)
+                if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None)
+                else "0x0"
+            )
+            subsystem = (
+                pe.OPTIONAL_HEADER.Subsystem
+                if (has_optional and pe.OPTIONAL_HEADER.Subsystem is not None)
+                else 0
+            )
+            subsystem_str = pefile.SUBSYSTEM_TYPE.get(subsystem, f"Unknown ({subsystem})")
 
-    # Sections
-    features["sections"] = []
+            try:
+                imphash = pe.get_imphash()
+            except Exception:
+                imphash = ""
 
-    for section in pe.sections:
-        section_name = section.Name.decode('utf-8', errors='ignore').strip('\x00')
-        section_data = section.get_data()
-        
-        # Quyen R W X
-        characteristics = []
-        char_val = section.Characteristics
+            features["headers"] = {
+                "machine": pefile.MACHINE_TYPE.get(
+                    pe.FILE_HEADER.Machine, f"Unknown ({hex(pe.FILE_HEADER.Machine)})"
+                ),
+                "compile_time": compile_time,
+                "entry_point": entry_point,
+                "image_base": image_base,
+                "number_of_sections": pe.FILE_HEADER.NumberOfSections,
+                "subsystem": subsystem_str,
+                "imphash": imphash
+            }
 
-        if char_val & 0x40000000: characteristics.append("READ")
-        if char_val & 0x80000000: characteristics.append("WRITE")
-        if char_val & 0x20000000: characteristics.append("EXECUTE")
+            # Sections
+            features["sections"] = []
 
-        features["sections"].append({
-            "name": section_name,
-            "virtual_address": hex(section.VirtualAddress),
-            "virtual_size": section.Misc_VirtualSize,
-            "raw_size": section.SizeOfRawData,
-            "entropy": calculate_entropy(section_data),
-            "characteristics": characteristics
-        })
-
-    # IAT
-    features["imports"] = {}
-
-    if hasattr(pe, 'DIRECTORY_ENTRY_IMPORT'):
-        for entry in pe.DIRECTORY_ENTRY_IMPORT:
-            dll_name = entry.dll.decode('utf-8', errors='ignore')
-            features["imports"][dll_name] = []
-
-            for imp in entry.imports:
-                if imp.name:
-                    func_name = imp.name.decode('utf-8', errors='ignore')
-
-                else:
-                    func_name = f"ordinal_{imp.ordinal}"
-
-                features["imports"][dll_name].append(func_name)
-
-    #  export
-    features["exports"] = []
-
-    if hasattr(pe, 'DIRECTORY_ENTRY_EXPORT'):
-        for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
-            if exp.name:
-                func_name = exp.name.decode('utf-8', errors='ignore')
-
-            else:
-                func_name = f"ordinal_{exp.ordinal}"
+            for section in pe.sections:
+                section_name = section.Name.decode('utf-8', errors='ignore').strip('\x00')
+                try:
+                    section_data = section.get_data()
+                except Exception:
+                    section_data = b""
                 
-            features["exports"].append({
-                "name": func_name,
-                "address": hex(pe.OPTIONAL_HEADER.ImageBase + exp.address)
-            })
+                # Quyen R W X
+                characteristics = []
+                char_val = section.Characteristics
 
-    pe.close()
+                if char_val & 0x40000000: characteristics.append("READ")
+                if char_val & 0x80000000: characteristics.append("WRITE")
+                if char_val & 0x20000000: characteristics.append("EXECUTE")
+
+                features["sections"].append({
+                    "name": section_name,
+                    "virtual_address": hex(section.VirtualAddress),
+                    "virtual_size": section.Misc_VirtualSize,
+                    "raw_size": section.SizeOfRawData,
+                    "entropy": calculate_entropy(section_data),
+                    "characteristics": characteristics
+                })
+
+            # IAT
+            features["imports"] = {}
+
+            if hasattr(pe, 'DIRECTORY_ENTRY_IMPORT'):
+                try:
+                    for entry in pe.DIRECTORY_ENTRY_IMPORT:
+                        if not entry.dll:
+                            continue
+                        dll_name = entry.dll.decode('utf-8', errors='ignore')
+                        features["imports"][dll_name] = []
+
+                        for imp in entry.imports:
+                            if imp.name:
+                                func_name = imp.name.decode('utf-8', errors='ignore')
+                            else:
+                                func_name = f"ordinal_{imp.ordinal}"
+
+                            features["imports"][dll_name].append(func_name)
+                except Exception:
+                    pass
+
+            # export
+            features["exports"] = []
+
+            if hasattr(pe, 'DIRECTORY_ENTRY_EXPORT'):
+                try:
+                    img_base = (
+                        pe.OPTIONAL_HEADER.ImageBase
+                        if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None)
+                        else 0
+                    )
+                    for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
+                        if exp.name:
+                            func_name = exp.name.decode('utf-8', errors='ignore')
+                        else:
+                            func_name = f"ordinal_{exp.ordinal}"
+                            
+                        if exp.address is not None:
+                            address_str = hex(img_base + exp.address)
+                        else:
+                            address_str = "None"
+                            
+                        features["exports"].append({
+                            "name": func_name,
+                            "address": address_str
+                        })
+                except Exception:
+                    pass
+
+    except Exception as e:
+        features["error"] = f"Failed to parse PE file structure: {e}"
+
     return features
 
 def process_multiple_files(file_paths, output_json_path):
