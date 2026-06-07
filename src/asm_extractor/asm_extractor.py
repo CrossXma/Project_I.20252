@@ -69,28 +69,30 @@ def extract_opcodes(filepath):
     """
 
     try:
-        pe = pefile.PE(filepath)
+        with pefile.PE(filepath) as pe:
+            text_section = get_text_section(pe)
 
-        text_section = get_text_section(pe)
+            if text_section is None:
+                return []
 
-        if text_section is None:
-            return []
+            code = text_section.get_data()
 
-        code = text_section.get_data()
+            has_optional = hasattr(pe, 'OPTIONAL_HEADER')
+            image_base = pe.OPTIONAL_HEADER.ImageBase if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None) else 0
 
-        address = (
-            pe.OPTIONAL_HEADER.ImageBase
-            + text_section.VirtualAddress
-        )
+            address = (
+                image_base
+                + text_section.VirtualAddress
+            )
 
-        md = Cs(CS_ARCH_X86, CS_MODE_32)
+            md = Cs(CS_ARCH_X86, CS_MODE_32)
 
-        opcodes = []
+            opcodes = []
 
-        for ins in md.disasm(code, address):
-            opcodes.append(ins.mnemonic)
+            for ins in md.disasm(code, address):
+                opcodes.append(ins.mnemonic)
 
-        return opcodes
+            return opcodes
 
     except Exception:
         return []
@@ -216,40 +218,45 @@ def save_disassembly(
         filepath,
         output_path):
 
-    pe = pefile.PE(filepath)
+    try:
+        with pefile.PE(filepath) as pe:
+            text_section = get_text_section(pe)
 
-    text_section = get_text_section(pe)
+            if text_section is None:
+                return
 
-    if text_section is None:
-        return
+            code = text_section.get_data()
 
-    code = text_section.get_data()
+            has_optional = hasattr(pe, 'OPTIONAL_HEADER')
+            image_base = pe.OPTIONAL_HEADER.ImageBase if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None) else 0
 
-    address = (
-        pe.OPTIONAL_HEADER.ImageBase
-        + text_section.VirtualAddress
-    )
-
-    md = Cs(
-        CS_ARCH_X86,
-        CS_MODE_32
-    )
-
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        for ins in md.disasm(
-                code,
-                address):
-
-            f.write(
-                f"{hex(ins.address)}: "
-                f"{ins.mnemonic} "
-                f"{ins.op_str}\n"
+            address = (
+                image_base
+                + text_section.VirtualAddress
             )
+
+            md = Cs(
+                CS_ARCH_X86,
+                CS_MODE_32
+            )
+
+            with open(
+                output_path,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                for ins in md.disasm(
+                        code,
+                        address):
+
+                    f.write(
+                        f"{hex(ins.address)}: "
+                        f"{ins.mnemonic} "
+                        f"{ins.op_str}\n"
+                    )
+    except Exception:
+        pass
 
 
 # ============================================================
