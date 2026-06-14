@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import hashlib
 from collections import Counter
 
 import pefile
@@ -263,6 +264,24 @@ def save_disassembly(
 # MAIN FEATURE EXTRACTION
 # ============================================================
 
+def calculate_hashes(file_path):
+    md5 = hashlib.md5()
+    sha1 = hashlib.sha1()
+    sha256 = hashlib.sha256()
+    
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(8192):
+            md5.update(chunk)
+            sha1.update(chunk)
+            sha256.update(chunk)
+            
+    return {
+        "md5": md5.hexdigest(),
+        "sha1": sha1.hexdigest(),
+        "sha256": sha256.hexdigest()
+    }
+
+
 def extract_asm_features(filepath):
 
     opcodes = extract_opcodes(filepath)
@@ -271,7 +290,19 @@ def extract_asm_features(filepath):
 
     constants = extract_constants(filepath)
 
+    try:
+        file_info = {
+            "file_name": os.path.basename(filepath),
+            "file_size_bytes": os.path.getsize(filepath),
+            **calculate_hashes(filepath)
+        }
+    except Exception:
+        file_info = {}
+
     return {
+
+        "file_info":
+            file_info,
 
         "opcode_count":
             len(opcodes),
@@ -313,6 +344,10 @@ def save_feature_json(
     features = extract_asm_features(
         filepath
     )
+
+    output_dir = os.path.dirname(output_json)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
     with open(
         output_json,
@@ -414,36 +449,50 @@ def process_dataset(dataset_root,
                 )
 
 # ============================================================
+# PROCESS MULTIPLE FILES
+# ============================================================
+
+def process_multiple_files(file_paths, output_json_path):
+    combined_results = {}
+
+    for path in file_paths:
+        features = extract_asm_features(path)
+        
+        if not features.get("file_info"):
+            key = path
+        else:
+            key = features["file_info"]["sha256"]
+
+        combined_results[key] = features
+
+    output_dir = os.path.dirname(output_json_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    with open(output_json_path, 'w', encoding='utf-8') as f:
+        json.dump(combined_results, f, indent=4, ensure_ascii=False)
+
+
+# ============================================================
 # ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
 
-    # process_dataset(
-    #     dataset_root="../dataset/malware",
-    #     feature_root="../dataset/features/malware",
-    #     asm_root="../dataset/asm/malware"
-    # )
+    #Chinh duong dan o day
 
-    # process_dataset(
-    #     dataset_root="../dataset/benign",
-    #     feature_root="../dataset/features/benign",
-    #     asm_root="../dataset/asm/benign"
-    # )
+    folder_path = "../../dataset/raw/malware" #<---
+    files_to_analyze = []
 
-    # ============================================================
-    # TEST
-    # ============================================================
+    if os.path.exists(folder_path):
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.lower().endswith(('.exe', '.dll', '.sys')):
+                    files_to_analyze.append(os.path.join(root, file))
 
-    sample = r"sample.exe"
+    output_file = "../../output/asm_features.json" # Ten file tra ve
 
-    features = extract_asm_features(
-        sample
-    )
-
-    print(
-        json.dumps(
-            features,
-            indent=4
-        )
-    )
+    if files_to_analyze:
+        process_multiple_files(files_to_analyze, output_file)
+    else:
+        print("Cannot find any files")
