@@ -1,1 +1,1 @@
-python -m pip install pefile capstone yara-python pandas scikit-learn numpy matplotlib jupyter
+python -m pip install requests pefile capstone yara-python pandas scikit-learn numpy matplotlib jupyter
