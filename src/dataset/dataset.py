@@ -1,28 +1,34 @@
 import os
 import time
 import json
+import zipfile
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+try:
+    import pyzipper
+except ImportError:
+    pyzipper = None
 
 # ==========================================================
 # CONFIG
 # ==========================================================
 
 API_URL = "https://mb-api.abuse.ch/api/v1/"
-HEADER = {"Auth-Key": "YOUR-AUTH-KEY-HERE"}
+HEADER = {"Auth-Key": "YOUR_AUTH_KEY_HERE"}
 
 MALWARE_TYPE = {
-    "trojan": ("AgentTesla"),
-    "botnet": ("Mirai"),
-    "ransomware": ("WannaCry", "LockBit", "Phobos"),
-    "spyware": ("RedLineStealer"),
-    "worm": ("QakBot", "Emotet"),
-    "rat": ("AsyncRAT")}      # Malware families
+    "trojan": ["AgentTesla"],
+    "botnet": ["Mirai"],
+    "ransomware": ["WannaCry", "LockBit", "Phobos"],
+    "spyware": ["RedLineStealer"],
+    "worm": ["QakBot", "Emotet"],
+    "rat": ["AsyncRAT"]}      # Malware families
 TARGET_COUNT = 500        # Number of samples wanted each types
 MAX_WORKERS = 20
 
-OUTPUT_DIR = "../../dataset/raw/malware"
-HASH_FILE = "downloaded_hashes.txt"
+OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dataset", "malware"))
+HASH_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "downloaded_hashes.txt"))
 
 ZIP_PASSWORD = b"infected"
 
@@ -82,20 +88,20 @@ def is_windows_pe(entry):
 
 
 def query_family(signature, limit=100):
-    """
-    Query MalwareBazaar for a malware family.
-    """
-
     data = {
         "query": "get_siginfo",
         "signature": signature,
         "limit": str(limit)
     }
 
-    r = requests.post(API_URL, headers=HEADER, data=data, timeout=60)
-    r.raise_for_status()
-
-    result = r.json()
+    try:
+        r = requests.post(API_URL, headers=HEADER, data=data, timeout=60)
+        r.raise_for_status()
+        result = r.json()
+    except Exception as e:
+        print(f"[-] API error: {e}")
+        print("[-] Please ensure you have replaced 'YOUR-AUTH-KEY-HERE' with a valid API key in dataset.py")
+        return []
 
     if result.get("query_status") != "ok":
         return []
@@ -121,8 +127,25 @@ def download_sample(sha256, type):
             f"{sha256}.zip"
         )
 
+        # If the zip file already exists on disk, try to extract it (in case a previous run failed to extract it)
         if os.path.exists(save_path):
-            return "exists", sha256
+            try:
+                if pyzipper is not None:
+                    with pyzipper.AESZipFile(save_path) as z:
+                        z.extractall(path=output_path, pwd=ZIP_PASSWORD)
+                else:
+                    with zipfile.ZipFile(save_path) as z:
+                        z.extractall(path=output_path, pwd=ZIP_PASSWORD)
+                os.remove(save_path)
+                save_hash(sha256)
+                return "downloaded", sha256
+            except Exception:
+                # If extraction fails (e.g. missing pyzipper or corrupted file), delete it so it can be re-downloaded
+                try:
+                    os.remove(save_path)
+                except Exception:
+                    pass
+                return "failed", sha256
 
         payload = {
             "query": "get_file",
@@ -141,6 +164,14 @@ def download_sample(sha256, type):
 
         with open(save_path, "wb") as f:
             f.write(r.content)
+
+        if pyzipper is not None:
+            with pyzipper.AESZipFile(save_path) as z:
+                z.extractall(path=output_path, pwd=ZIP_PASSWORD)
+        else:
+            with zipfile.ZipFile(save_path) as z:
+                z.extractall(path=output_path, pwd=ZIP_PASSWORD)
+        os.remove(save_path)
 
         save_hash(sha256)
 
@@ -172,7 +203,7 @@ def main():
 
             if not samples:
                 print("No samples returned.")
-                return
+                continue
 
             print(f"Found {len(samples)} candidate samples")
 
@@ -195,11 +226,13 @@ def main():
 
             print(f"PE candidates: {len(candidates)}")
 
-            remaining = target - len(downloaded_hashes)
+            output_path = os.path.join(OUTPUT_DIR, type)
+            existing = len(os.listdir(output_path)) if os.path.exists(output_path) else 0
+            remaining = target - existing
 
             if remaining <= 0:
                 print("Target already reached.")
-                return
+                continue
 
             candidates = candidates[:remaining]
 
@@ -238,7 +271,7 @@ def main():
                     else:
                         print(f"Failed: {sha256}")
 
-                    if len(downloaded_hashes) >= target:
+                    if downloaded >= remaining:
                         break
 
             print("\nDone.")
