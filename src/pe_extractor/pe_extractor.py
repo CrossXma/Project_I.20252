@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     #Chinh duong dan o day
 
-    folder_path = "../../dataset/raw/malware" #<---
+    folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dataset", "benign"))
     files_to_analyze = []
     
     if os.path.exists(folder_path):
@@ -219,7 +219,7 @@ if __name__ == "__main__":
                 if file.lower().endswith(('.exe', '.dll', '.sys')):
                     files_to_analyze.append(os.path.join(root, file))
 
-    output_file = "../../output/pe_features.json" # Ten file tra ve
+    output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "output", "pe_features.json"))
     
     if files_to_analyze:
         process_multiple_files(files_to_analyze, output_file)
