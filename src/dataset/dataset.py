@@ -214,7 +214,8 @@ def main():
                 futures = [
                     executor.submit(
                         download_sample,
-                        sha256
+                        sha256,
+                        type
                     )
                     for sha256 in candidates
                 ]
