@@ -197,6 +197,10 @@ def process_multiple_files(file_paths, output_json_path):
 
         combined_results[key] = features
 
+    output_dir = os.path.dirname(output_json_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     with open(output_json_path, 'w', encoding='utf-8') as f:
         json.dump(combined_results, f, indent=4, ensure_ascii=False)
         
@@ -206,7 +210,7 @@ if __name__ == "__main__":
 
     #Chinh duong dan o day
 
-    folder_path = "./my_malware_samples" #<---
+    folder_path = "../../dataset/raw/malware" #<---
     files_to_analyze = []
     
     if os.path.exists(folder_path):
@@ -215,7 +219,7 @@ if __name__ == "__main__":
                 if file.lower().endswith(('.exe', '.dll', '.sys')):
                     files_to_analyze.append(os.path.join(root, file))
 
-    output_file = "pe_features.json" # Ten file tra ve
+    output_file = "../../output/pe_features.json" # Ten file tra ve
     
     if files_to_analyze:
         process_multiple_files(files_to_analyze, output_file)
