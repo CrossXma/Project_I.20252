@@ -20,10 +20,10 @@ except ImportError:
     extract_asm_features = None
 
 # Paths to feature files
-pe_benign_path = r"d:\Documents\Project 1\Project_I.20252\output\benign_pe_features.json"
-pe_malware_path = r"d:\Documents\Project 1\Project_I.20252\output\malware_pe_features.json"
-asm_benign_path = r"d:\Documents\Project 1\Project_I.20252\output\benign_asm_features.json"
-asm_malware_path = r"d:\Documents\Project 1\Project_I.20252\output\malware_asm_features.json"
+pe_benign_path = r"d:\Documents\Project_1\Project_I.20252\output\benign_pe_features.json"
+pe_malware_path = r"d:\Documents\Project_1\Project_I.20252\output\malware_pe_features.json"
+asm_benign_path = r"d:\Documents\Project_1\Project_I.20252\output\benign_asm_features.json"
+asm_malware_path = r"d:\Documents\Project_1\Project_I.20252\output\malware_asm_features.json"
 
 def load_json(path):
     if not os.path.exists(path):
