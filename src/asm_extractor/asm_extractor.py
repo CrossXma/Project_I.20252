@@ -2,7 +2,14 @@ import os
 import re
 import json
 import hashlib
+import tempfile
+import zipfile
 from collections import Counter
+
+try:
+    import pyzipper
+except ImportError:
+    pyzipper = None
 
 import pefile
 from capstone import *
@@ -11,6 +18,8 @@ from capstone import *
 # ============================================================
 # CONFIG
 # ============================================================
+
+ZIP_PASSWORD = b"infected"
 
 SUSPICIOUS_STRINGS = {
     "powershell",
@@ -64,13 +73,18 @@ def get_text_section(pe):
 # DISASSEMBLY
 # ============================================================
 
-def extract_opcodes(filepath):
+def extract_opcodes(filepath, data=None):
     """
     Extract opcode mnemonics from .text section.
     """
 
     try:
-        with pefile.PE(filepath) as pe:
+        if data is not None:
+            pe = pefile.PE(data=data)
+        else:
+            pe = pefile.PE(filepath)
+            
+        with pe:
             text_section = get_text_section(pe)
 
             if text_section is None:
@@ -130,11 +144,12 @@ def opcode_ngrams(opcodes, n=3):
 # STRING EXTRACTION
 # ============================================================
 
-def extract_strings(filepath, min_length=4):
+def extract_strings(filepath, min_length=4, data=None):
 
     try:
-        with open(filepath, "rb") as f:
-            data = f.read()
+        if data is None:
+            with open(filepath, "rb") as f:
+                data = f.read()
 
         pattern = rb"[\x20-\x7E]{%d,}" % min_length
 
@@ -173,11 +188,12 @@ def suspicious_strings(strings):
 # CONSTANT EXTRACTION
 # ============================================================
 
-def extract_constants(filepath):
+def extract_constants(filepath, data=None):
 
     try:
-        with open(filepath, "rb") as f:
-            data = f.read()
+        if data is None:
+            with open(filepath, "rb") as f:
+                data = f.read()
 
         matches = re.findall(
             rb"\d{2,10}",
@@ -218,6 +234,49 @@ def detect_ports(constants):
 def save_disassembly(
         filepath,
         output_path):
+
+    if filepath.lower().endswith('.zip'):
+        try:
+            if pyzipper is not None:
+                with pyzipper.AESZipFile(filepath) as z:
+                    for name in z.namelist():
+                        data = z.read(name, pwd=ZIP_PASSWORD)
+                        # Process first file
+                        pe = pefile.PE(data=data)
+                        with pe:
+                            text_section = get_text_section(pe)
+                            if text_section is None:
+                                return
+                            code = text_section.get_data()
+                            has_optional = hasattr(pe, 'OPTIONAL_HEADER')
+                            image_base = pe.OPTIONAL_HEADER.ImageBase if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None) else 0
+                            address = (image_base + text_section.VirtualAddress)
+                            md = Cs(CS_ARCH_X86, CS_MODE_32)
+                            with open(output_path, "w", encoding="utf-8") as f:
+                                for ins in md.disasm(code, address):
+                                    f.write(f"{hex(ins.address)}: {ins.mnemonic} {ins.op_str}\n")
+                        return
+            else:
+                with zipfile.ZipFile(filepath) as z:
+                    for name in z.namelist():
+                        data = z.read(name, pwd=ZIP_PASSWORD)
+                        pe = pefile.PE(data=data)
+                        with pe:
+                            text_section = get_text_section(pe)
+                            if text_section is None:
+                                return
+                            code = text_section.get_data()
+                            has_optional = hasattr(pe, 'OPTIONAL_HEADER')
+                            image_base = pe.OPTIONAL_HEADER.ImageBase if (has_optional and pe.OPTIONAL_HEADER.ImageBase is not None) else 0
+                            address = (image_base + text_section.VirtualAddress)
+                            md = Cs(CS_ARCH_X86, CS_MODE_32)
+                            with open(output_path, "w", encoding="utf-8") as f:
+                                for ins in md.disasm(code, address):
+                                    f.write(f"{hex(ins.address)}: {ins.mnemonic} {ins.op_str}\n")
+                        return
+        except Exception:
+            pass
+        return
 
     try:
         with pefile.PE(filepath) as pe:
@@ -264,16 +323,21 @@ def save_disassembly(
 # MAIN FEATURE EXTRACTION
 # ============================================================
 
-def calculate_hashes(file_path):
+def calculate_hashes(file_path, data=None):
     md5 = hashlib.md5()
     sha1 = hashlib.sha1()
     sha256 = hashlib.sha256()
     
-    with open(file_path, 'rb') as f:
-        while chunk := f.read(8192):
-            md5.update(chunk)
-            sha1.update(chunk)
-            sha256.update(chunk)
+    if data is not None:
+        md5.update(data)
+        sha1.update(data)
+        sha256.update(data)
+    else:
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                md5.update(chunk)
+                sha1.update(chunk)
+                sha256.update(chunk)
             
     return {
         "md5": md5.hexdigest(),
@@ -282,21 +346,44 @@ def calculate_hashes(file_path):
     }
 
 
-def extract_asm_features(filepath):
+def extract_asm_features(filepath, data=None):
 
-    opcodes = extract_opcodes(filepath)
+    if data is None and filepath.lower().endswith('.zip'):
+        try:
+            if pyzipper is not None:
+                with pyzipper.AESZipFile(filepath) as z:
+                    for name in z.namelist():
+                        inner_data = z.read(name, pwd=ZIP_PASSWORD)
+                        features = extract_asm_features(filepath, data=inner_data)
+                        if "file_info" in features and features["file_info"]:
+                            features["file_info"]["file_name"] = name
+                        return features
+            else:
+                with zipfile.ZipFile(filepath) as z:
+                    for name in z.namelist():
+                        inner_data = z.read(name, pwd=ZIP_PASSWORD)
+                        features = extract_asm_features(filepath, data=inner_data)
+                        if "file_info" in features and features["file_info"]:
+                            features["file_info"]["file_name"] = name
+                        return features
+        except Exception as e:
+            print(f"[-] Error extracting zip {filepath}: {e}")
+            return {}
 
-    strings = extract_strings(filepath)
+    opcodes = extract_opcodes(filepath, data=data)
 
-    constants = extract_constants(filepath)
+    strings = extract_strings(filepath, data=data)
+
+    constants = extract_constants(filepath, data=data)
 
     try:
         file_info = {
             "file_name": os.path.basename(filepath),
-            "file_size_bytes": os.path.getsize(filepath),
-            **calculate_hashes(filepath)
+            "file_size_bytes": len(data) if data is not None else os.path.getsize(filepath),
+            **calculate_hashes(filepath, data=data)
         }
-    except Exception:
+    except Exception as e:
+        print(f"[-] Hash/info extraction error for {filepath}: {e}")
         file_info = {}
 
     return {
@@ -399,9 +486,17 @@ def process_dataset(dataset_root,
                     filepath
                 )
 
+                # Determine output filename (use inner file name if it was a zip)
+                out_name = filename
+                if filename.lower().endswith('.zip'):
+                    if features.get("file_info") and "file_name" in features["file_info"]:
+                        out_name = features["file_info"]["file_name"]
+                    else:
+                        out_name = filename[:-4]
+
                 json_path = os.path.join(
                     feature_dir,
-                    f"{filename}.json"
+                    f"{out_name}.json"
                 )
 
                 with open(
@@ -430,7 +525,7 @@ def process_dataset(dataset_root,
 
                     asm_path = os.path.join(
                         asm_dir,
-                        f"{filename}.asm"
+                        f"{out_name}.asm"
                     )
 
                     save_disassembly(
@@ -439,7 +534,7 @@ def process_dataset(dataset_root,
                     )
 
                 print(
-                    f"[+] {filename}"
+                    f"[+] {out_name}"
                 )
 
             except Exception as e:
@@ -458,7 +553,7 @@ def process_multiple_files(file_paths, output_json_path):
     for path in file_paths:
         features = extract_asm_features(path)
         
-        if not features.get("file_info"):
+        if not features.get("file_info") or "sha256" not in features["file_info"]:
             key = path
         else:
             key = features["file_info"]["sha256"]
@@ -487,7 +582,7 @@ if __name__ == "__main__":
     if os.path.exists(folder_path):
         for root, dirs, files in os.walk(folder_path):
             for file in files:
-                if file.lower().endswith(('.exe', '.dll', '.sys')):
+                if file.lower().endswith(('.exe', '.dll', '.sys', '.zip')):
                     files_to_analyze.append(os.path.join(root, file))
 
     output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "output", "asm_features.json"))
