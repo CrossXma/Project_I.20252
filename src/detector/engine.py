@@ -1,4 +1,5 @@
 import os
+import math
 try:
     from . import rules
 except ImportError:
@@ -526,9 +527,21 @@ class MalwareDetector:
 
     def detect(self, pe_features, asm_features):
         score, details, behaviors = self.calculate_score(pe_features, asm_features)
+        
+        # Calculate malware probability
+        if score <= 0:
+            prob = 0.0
+        elif score < self.threshold:
+            prob = (score / self.threshold) * 50.0
+        else:
+            # score >= threshold
+            # Using a smooth exponential curve approaching 100%
+            prob = 50.0 + 50.0 * (1.0 - math.exp(-0.05 * (score - self.threshold)))
+            
         return {
             "is_malware": score >= self.threshold,
             "score": score,
+            "malware_probability": prob,
             "details": details,
             "detected_behaviors": behaviors
         }

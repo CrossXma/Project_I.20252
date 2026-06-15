@@ -3,18 +3,30 @@ import json
 import hashlib
 import math
 import datetime
+import zipfile
+try:
+    import pyzipper
+except ImportError:
+    pyzipper = None
 import pefile
 
-def calculate_hashes(file_path):
+ZIP_PASSWORD = b"infected"
+
+def calculate_hashes(file_path, data=None):
     md5 = hashlib.md5()
     sha1 = hashlib.sha1()
     sha256 = hashlib.sha256()
     
-    with open(file_path, 'rb') as f:
-        while chunk := f.read(8192):
-            md5.update(chunk)
-            sha1.update(chunk)
-            sha256.update(chunk)
+    if data is not None:
+        md5.update(data)
+        sha1.update(data)
+        sha256.update(data)
+    else:
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                md5.update(chunk)
+                sha1.update(chunk)
+                sha256.update(chunk)
             
     return {
         "md5": md5.hexdigest(),
@@ -41,8 +53,29 @@ def calculate_entropy(data):
 
     return round(entropy, 4)
 
-def extract_pe_info(file_path):
-    if not os.path.exists(file_path):
+def extract_pe_info(file_path, data=None):
+    if data is None and file_path.lower().endswith('.zip'):
+        try:
+            if pyzipper is not None:
+                with pyzipper.AESZipFile(file_path) as z:
+                    for name in z.namelist():
+                        inner_data = z.read(name, pwd=ZIP_PASSWORD)
+                        features = extract_pe_info(file_path, data=inner_data)
+                        if "file_info" in features and features["file_info"]:
+                            features["file_info"]["file_name"] = name
+                        return features
+            else:
+                with zipfile.ZipFile(file_path) as z:
+                    for name in z.namelist():
+                        inner_data = z.read(name, pwd=ZIP_PASSWORD)
+                        features = extract_pe_info(file_path, data=inner_data)
+                        if "file_info" in features and features["file_info"]:
+                            features["file_info"]["file_name"] = name
+                        return features
+        except Exception as e:
+            return {"error": f"Failed to extract PE info from ZIP {file_path}: {e}"}
+
+    if data is None and not os.path.exists(file_path):
         return {"error": f"File {file_path} khong ton tai."}
 
     features = {}
@@ -51,14 +84,19 @@ def extract_pe_info(file_path):
         # Ten + Kthc + Hash
         features["file_info"] = {
             "file_name": os.path.basename(file_path),
-            "file_size_bytes": os.path.getsize(file_path),
-            **calculate_hashes(file_path)
+            "file_size_bytes": len(data) if data is not None else os.path.getsize(file_path),
+            **calculate_hashes(file_path, data=data)
         }
     except Exception as e:
         return {"error": f"Failed to compute file hashes/info: {e}"}
 
     try:
-        with pefile.PE(file_path) as pe:
+        if data is not None:
+            pe = pefile.PE(data=data)
+        else:
+            pe = pefile.PE(file_path)
+            
+        with pe:
             # Header
             try:
                 compile_time = datetime.datetime.fromtimestamp(

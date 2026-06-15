@@ -46,11 +46,7 @@ def evaluate_file(file_path, detector):
         print(f"Error: File not found at {file_path}")
         return
 
-    # Check for zipped file
-    if file_path.lower().endswith('.zip'):
-        print(f"Error: Cannot analyze zipped file '{os.path.basename(file_path)}' statically.")
-        print("Please unzip the malware file/dataset in your VM first, then evaluate the unzipped file.")
-        return
+
 
     if extract_pe_info is None or extract_asm_features is None:
         print("Error: Extraction modules not available.")
@@ -75,7 +71,7 @@ def evaluate_file(file_path, detector):
     print(f"File: {os.path.basename(file_path)}")
     print(f"Hash: {pe_features['file_info']['sha256']}")
     status = "MALWARE" if res["is_malware"] else "BENIGN"
-    print(f"Result: {status} (Score: {res['score']}/{detector.threshold})")
+    print(f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
     print("--------------------------------------------------")
     print("Details:")
     if res["details"]:
@@ -106,11 +102,11 @@ def evaluate_directory(dir_path, detector):
     executables = []
     for root, dirs, files in os.walk(dir_path):
         for file in files:
-            if file.lower().endswith(('.exe', '.dll', '.sys')):
+            if file.lower().endswith(('.exe', '.dll', '.sys', '.zip')):
                 executables.append(os.path.join(root, file))
 
     if not executables:
-        print("No executable files (.exe, .dll, .sys) found in directory.")
+        print("No executable files (.exe, .dll, .sys, .zip) found in directory.")
         return
 
     print(f"Found {len(executables)} executable files. Evaluating...")
@@ -131,7 +127,7 @@ def evaluate_directory(dir_path, detector):
         else:
             benign_count += 1
         
-        print(f"[{status}] (Score: {res['score']}) {os.path.basename(file_path)}")
+        print(f"[{status}] (Score: {res['score']}, Probability: {res['malware_probability']:.2f}%) {os.path.basename(file_path)}")
 
     print("==================================================")
     print("          DATASET EVALUATION REPORT               ")
@@ -166,7 +162,7 @@ def evaluate_random_sample(pe_path, asm_path, detector, label="MALWARE"):
     print(f"File: {data['pe']['file_info']['file_name']}")
     print(f"Hash: {h}")
     status = "MALWARE" if res["is_malware"] else "BENIGN"
-    print(f"Result: {status} (Score: {res['score']}/{detector.threshold})")
+    print(f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
     print("--------------------------------------------------")
     print("Details:")
     if res["details"]:
