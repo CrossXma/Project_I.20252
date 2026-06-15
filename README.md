@@ -29,7 +29,11 @@ I.Windows VM
 	RAM:	4–8 GB
 	CPU:	2 cores
 	Disk:	60 GB
+<<<<<<< HEAD
 	OS:	Windows 10/11 x64
+=======
+	OS:	Windows 10 x64
+>>>>>>> origin/dataset
 
 2.Important Security Configuration:
 Disable Network (VERY IMPORTANT)
