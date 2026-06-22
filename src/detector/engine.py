@@ -105,16 +105,30 @@ class MalwareDetector:
         if not has_execute_section:
             return 0, ["No executable sections found (data or resource file)"], []
 
+        # Extract imports early
+        imports = pe_features.get("imports", {})
+        dll_count = len(imports)
+        func_count = sum(len(funcs) for funcs in imports.values())
+
+        # .NET Check (improved to recognize DLLs via _CorDllMain)
+        has_dotnet = False
+        for dll, funcs in imports.items():
+            func_names = [f.lower() for f in funcs]
+            if "_corexemain" in func_names or "_cordllmain" in func_names:
+                has_dotnet = True
+                break
+
         # Instantiate FSMs
         behavior_fsm = BehaviorFSM()
         decryptor_fsm = DecryptionLoopFSM()
 
-        # Feed Opcode ngrams to Decryptor FSM
-        ngrams = asm_features.get("opcode_ngrams", [])
-        for ngram in ngrams:
-            decryptor_fsm.feed(ngram)
-            if decryptor_fsm.is_decryptor():
-                break
+        # Feed Opcode ngrams to Decryptor FSM (skip for .NET binaries)
+        if not has_dotnet:
+            ngrams = asm_features.get("opcode_ngrams", [])
+            for ngram in ngrams:
+                decryptor_fsm.feed(ngram)
+                if decryptor_fsm.is_decryptor():
+                    break
 
         if decryptor_fsm.is_decryptor():
             score += 25
@@ -133,6 +147,7 @@ class MalwareDetector:
         has_mismatch = False
         has_susp_sec = False
         has_slash_sec = False
+        rsrc_size = 0
 
         for sec in sections:
             ent = sec.get("entropy", 0)
@@ -154,6 +169,8 @@ class MalwareDetector:
                 has_susp_sec = True
             if sec_name.startswith('/'):
                 has_slash_sec = True
+            if ".rsrc" in sec_name_lower:
+                rsrc_size = vsize
 
         if max_entropy > 7.9:
             score += 45
@@ -194,14 +211,12 @@ class MalwareDetector:
             score += 25
             details.append(f"Low opcode density: {opcode_count} opcodes for {file_size} bytes (wrapper/dropper)")
 
-        # Imports complexity
-        imports = pe_features.get("imports", {})
-        dll_count = len(imports)
-        func_count = sum(len(funcs) for funcs in imports.values())
-
+        # Imports complexity rules
         if dll_count == 0:
-            score += 60
-            details.append("Zero imports table (extreme anomaly, packed/shellcode)")
+            # Resource/metadata only files with zero imports and low entropy should not be penalized
+            if max_entropy > 6.0:
+                score += 60
+                details.append("Zero imports table (extreme anomaly, packed/shellcode)")
         elif func_count < 5:
             score += 30
             details.append(f"Extremely few imports: {func_count} functions (likely packed)")
@@ -219,6 +234,8 @@ class MalwareDetector:
         has_getprocaddress = False
         has_loadlibrary = False
         has_virtualalloc = False
+        has_resource_api = False
+        has_proc_create_api = False
 
         apims_dll_count = 0
 
@@ -246,6 +263,11 @@ class MalwareDetector:
                 if is_driver and fl in ["zwterminateprocess", "zwopenprocess", "zwreadvirtualmemory", "zwwritevirtualmemory", "zwprotectvirtualmemory", "ntterminateprocess"]:
                     driver_proc_ctrl = True
 
+                if fl in ["findresourcea", "findresourcew", "findresourceex", "loadresource", "lockresource", "sizeofresource"]:
+                    has_resource_api = True
+                if fl in ["createprocessa", "createprocessw", "winexec", "shellexecutea", "shellexecutew", "shellexecuteexa", "shellexecuteexw"]:
+                    has_proc_create_api = True
+
                 if fl in rules.INJECTION_APIS or fl.rstrip('aw') in rules.INJECTION_APIS:
                     injection_found.append(f)
                 if fl in rules.NETWORK_APIS or fl.rstrip('aw') in rules.NETWORK_APIS:
@@ -271,7 +293,7 @@ class MalwareDetector:
             details.append(f"Behavior FSM threat state reached: {behavior_fsm.state} (+{fsm_score} points)")
 
         if is_driver and driver_proc_ctrl:
-            score += 50
+            score += 20
             details.append("Kernel driver with process control capabilities")
 
         if has_advanced_debug:
@@ -334,18 +356,19 @@ class MalwareDetector:
             score += 15
             details.append("Dynamic API resolution pattern (GetProcAddress + LoadLibrary + VirtualAlloc)")
 
-        # Opcode Metrics
+        # Opcode Metrics (skip for .NET binaries)
         add_ratio = 0
         if opcode_count > 0:
             adds = asm_features.get("top_opcodes", {}).get("add", 0)
             add_ratio = adds / opcode_count
 
-            if add_ratio > 0.40:
-                score += 20 if is_dll else 40
-                details.append(f"Extremely high ADD instruction ratio: {add_ratio:.2%}")
-            elif add_ratio > 0.30:
-                score += 10 if is_dll else 25
-                details.append(f"High ADD instruction ratio: {add_ratio:.2%}")
+            if not has_dotnet:
+                if add_ratio > 0.40:
+                    score += 20 if is_dll else 40
+                    details.append(f"Extremely high ADD instruction ratio: {add_ratio:.2%}")
+                elif add_ratio > 0.30:
+                    score += 10 if is_dll else 25
+                    details.append(f"High ADD instruction ratio: {add_ratio:.2%}")
 
         # Strings
         raw_susp_strs = asm_features.get("suspicious_strings", [])
@@ -366,19 +389,21 @@ class MalwareDetector:
             score += min(len(susp_strs) * 10, 45)
             details.append(f"Suspicious strings count: {len(susp_strs)}")
 
-        # Library Discounts
-        exports = pe_features.get("exports", [])
-        if len(exports) > 50:
-            score -= 35
-            details.append(f"Major library discount: {len(exports)} functions exported")
-        elif len(exports) > 15:
-            score -= 25
-            details.append(f"Library discount: {len(exports)} functions exported")
-        elif len(exports) > 5:
-            score -= 15
-            details.append(f"Minor library discount: {len(exports)} functions exported")
+        # Library Discounts (skip for high-entropy packed files)
+        skip_discounts = max_entropy > 7.5
+        if not skip_discounts:
+            exports = pe_features.get("exports", [])
+            if len(exports) > 50:
+                score -= 35
+                details.append(f"Major library discount: {len(exports)} functions exported")
+            elif len(exports) > 15:
+                score -= 25
+                details.append(f"Library discount: {len(exports)} functions exported")
+            elif len(exports) > 5:
+                score -= 15
+                details.append(f"Minor library discount: {len(exports)} functions exported")
 
-        # System Complexity Discounts
+        # System Complexity Discounts (skip for high-entropy packed files)
         has_severe_behavior = (
             has_high_risk_string or
             has_slash_sec or
@@ -389,7 +414,7 @@ class MalwareDetector:
             (len(evasion_found) >= 2 and has_virtualalloc)
         )
 
-        if not has_severe_behavior:
+        if not has_severe_behavior and not skip_discounts:
             if dll_count > 12:
                 score -= 20
                 details.append(f"Complexity discount: {dll_count} DLLs imported")
@@ -398,19 +423,27 @@ class MalwareDetector:
                 details.append(f"Modern Windows SDK discount: {apims_dll_count} API-set DLLs imported")
 
         # .NET Check
-        has_dotnet = False
-        for dll, funcs in imports.items():
-            if "_corexemain" in [f.lower() for f in funcs]:
-                has_dotnet = True
-                break
-
         if has_dotnet:
-            if max_entropy > 7.0 or len(susp_strs) > 0 or add_ratio > 0.30:
+            is_obfuscated = max_entropy > 7.0 or len(susp_strs) > 0
+            if is_obfuscated:
                 score += 45
                 details.append("Obfuscated/Suspicious .NET executable")
             else:
                 score += 35
                 details.append(".NET executable")
+
+        # Dropper behavior detection logic (Resource APIs + Process Creation APIs + Large resource section ratio)
+        if has_resource_api and has_proc_create_api:
+            rsrc_ratio = rsrc_size / file_size if file_size > 0 else 0
+            if rsrc_ratio > 0.70:
+                score += 45
+                details.append(f"Dropper behavior detected (Large resource section: {rsrc_ratio:.1%})")
+
+        # Whitelist Windows / Driver system files
+        is_sys = pe_features.get("file_info", {}).get("file_name", "").lower().endswith(".sys")
+        if is_sys:
+            score -= 40
+            details.append("Driver whitelist discount")
 
         # Behavior Mapping
         detected_behaviors = []
