@@ -10,11 +10,11 @@ from evaluate import evaluate
 # DATASET PATHS
 # ==================================================
 
-BENIGN_PE = "./output/features/benign_pe_features.json"
-BENIGN_ASM = "./output/features/benign_asm_features.json"
+BENIGN_PE = "./output/benign_pe_features.json"
+BENIGN_ASM = "./output/benign_asm_features.json"
 
-MALWARE_PE = "./output/features/malware_pe_features.json"
-MALWARE_ASM = "./output/features/malware_asm_features.json"
+MALWARE_PE = "./output/malware_pe_features.json"
+MALWARE_ASM = "./output/malware_asm_features.json"
 
 OUTPUT_DIR = "./output/dataset"
 
