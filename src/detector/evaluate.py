@@ -119,6 +119,7 @@ def evaluate_directory(dir_path, detector):
 
     malware_count = 0
     benign_count = 0
+    report = []
 
     for file_path in executables:
         pe_features = extract_pe_info(file_path)
@@ -133,16 +134,23 @@ def evaluate_directory(dir_path, detector):
         else:
             benign_count += 1
 
-        print(
+        report.append(
             f"[{status}] (Score: {res['score']}, Probability: {res['malware_probability']:.2f}%) {os.path.basename(file_path)}")
 
-    print("==================================================")
-    print("          DATASET EVALUATION REPORT               ")
-    print("==================================================")
-    print(f"Total Evaluated Samples: {len(executables)}")
-    print(f"  Benign Detected      : {benign_count}")
-    print(f"  Malware Detected     : {malware_count}")
-    print("==================================================")
+    report.append("==================================================")
+    report.append("          DATASET EVALUATION REPORT               ")
+    report.append("==================================================")
+    report.append(f"Total Evaluated Samples: {len(executables)}")
+    report.append(f"  Benign Detected      : {benign_count}")
+    report.append(f"  Malware Detected     : {malware_count}")
+    report.append("==================================================")
+
+    report_content = "\n".join(report)
+    report_path = os.path.join(output_dir, "dataset_evaluation_report.txt")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+
+    print(f"Evaluation complete. Report written to: {report_path}")
 
 
 def evaluate_random_sample(pe_path, asm_path, detector, label="MALWARE"):
@@ -255,38 +263,47 @@ def main():
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
-    # Output results
-    print("==================================================")
-    print("          MALWARE DETECTOR EVALUATION REPORT      ")
-    print("==================================================")
-    print(f"Total Evaluated Samples: {total}")
-    print(f"  Benign Samples       : {len(benign_dataset)}")
-    print(f"  Malware Samples      : {len(malware_dataset)}")
-    print("--------------------------------------------------")
-    print(f"True Positives (TP)    : {tp}")
-    print(f"False Negatives (FN)   : {fn}")
-    print(f"True Negatives (TN)    : {tn}")
-    print(f"False Positives (FP)   : {fp}")
-    print("--------------------------------------------------")
-    print(f"Accuracy               : {accuracy:.4f}")
-    print(f"Precision              : {precision:.4f}")
-    print(f"Recall                 : {recall:.4f}")
-    print(f"F1 Score               : {f1:.4f}")
-    print("==================================================")
+    # Build report string
+    report = []
+    report.append("==================================================")
+    report.append("          MALWARE DETECTOR EVALUATION REPORT      ")
+    report.append("==================================================")
+    report.append(f"Total Evaluated Samples: {total}")
+    report.append(f"  Benign Samples       : {len(benign_dataset)}")
+    report.append(f"  Malware Samples      : {len(malware_dataset)}")
+    report.append("--------------------------------------------------")
+    report.append(f"True Positives (TP)    : {tp}")
+    report.append(f"False Negatives (FN)   : {fn}")
+    report.append(f"True Negatives (TN)    : {tn}")
+    report.append(f"False Positives (FP)   : {fp}")
+    report.append("--------------------------------------------------")
+    report.append(f"Accuracy               : {accuracy:.4f}")
+    report.append(f"Precision              : {precision:.4f}")
+    report.append(f"Recall                 : {recall:.4f}")
+    report.append(f"F1 Score               : {f1:.4f}")
+    report.append("==================================================")
 
     if false_positives:
-        print("\nFalse Positives Details:")
+        report.append("\nFalse Positives Details:")
         for h, name, score, details, behaviors in false_positives:
-            print(f"  Hash: {h} | Name: {name} | Score: {score}")
-            print(f"    Details: {details}")
-            print(f"    Behaviors: {behaviors}")
+            report.append(f"  Hash: {h} | Name: {name} | Score: {score}")
+            report.append(f"    Details: {details}")
+            report.append(f"    Behaviors: {behaviors}")
 
     if false_negatives:
-        print("\nFalse Negatives Details:")
+        report.append("\nFalse Negatives Details:")
         for h, name, score, details, behaviors in false_negatives:
-            print(f"  Hash: {h} | Name: {name} | Score: {score}")
-            print(f"    Details: {details}")
-            print(f"    Behaviors: {behaviors}")
+            report.append(f"  Hash: {h} | Name: {name} | Score: {score}")
+            report.append(f"    Details: {details}")
+            report.append(f"    Behaviors: {behaviors}")
+
+    report_content = "\n".join(report)
+    
+    report_path = os.path.join(output_dir, "evaluation_report.txt")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+        
+    print(f"Evaluation complete. Report written to: {report_path}")
 
 
 if __name__ == "__main__":
