@@ -1,0 +1,19 @@
+Accuracy : 0.9833
+Precision: 0.9837
+Recall   : 0.9833
+F1 Score : 0.9832
+
+Classification Report
+              precision    recall  f1-score   support
+
+      benign       0.98      1.00      0.99        41
+     malware       1.00      0.95      0.97        19
+
+    accuracy                           0.98        60
+   macro avg       0.99      0.97      0.98        60
+weighted avg       0.98      0.98      0.98        60
+
+
+Confusion Matrix
+[[41  0]
+ [ 1 18]]
