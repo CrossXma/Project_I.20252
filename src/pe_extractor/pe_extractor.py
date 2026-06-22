@@ -248,18 +248,24 @@ if __name__ == "__main__":
 
     #Chinh duong dan o day
 
-    folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dataset", "benign"))
-    files_to_analyze = []
-    
-    if os.path.exists(folder_path):
-        for root, dirs, files in os.walk(folder_path):
-            for file in files:
-                if file.lower().endswith(('.exe', '.dll', '.sys')):
-                    files_to_analyze.append(os.path.join(root, file))
+    dataset_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dataset"))
+    categories = ["benign", "malware"]
 
-    output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "output", "pe_features.json"))
-    
-    if files_to_analyze:
-        process_multiple_files(files_to_analyze, output_file)
-    else:
-        print("Cannot find any files")
+    for category in categories:
+        folder_path = os.path.join(dataset_dir, category)
+        files_to_analyze = []
+        
+        if os.path.exists(folder_path):
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    if file.lower().endswith(('.exe', '.dll', '.sys', '.zip')):
+                        files_to_analyze.append(os.path.join(root, file))
+
+        output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "output", f"{category}_pe_features.json"))
+        
+        print(f"Processing {category} files...")
+        if files_to_analyze:
+            process_multiple_files(files_to_analyze, output_file)
+            print(f"Saved {category} features to {output_file}")
+        else:
+            print(f"Cannot find any files in {folder_path}")
