@@ -19,7 +19,7 @@ except ImportError:
     extract_pe_info = None
     extract_asm_features = None
 
-# Paths to feature files 
+# Paths to feature files
 base_dir = os.path.dirname(os.path.abspath(__file__))
 output_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "output"))
 
@@ -28,11 +28,13 @@ pe_malware_path = os.path.join(output_dir, "malware_pe_features.json")
 asm_benign_path = os.path.join(output_dir, "benign_asm_features.json")
 asm_malware_path = os.path.join(output_dir, "malware_asm_features.json")
 
+
 def load_json(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Feature file not found at {path}")
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
 
 def combine_features(pe_data, asm_data):
     combined = {}
@@ -44,12 +46,11 @@ def combine_features(pe_data, asm_data):
             }
     return combined
 
+
 def evaluate_file(file_path, detector):
     if not os.path.exists(file_path):
         print(f"Error: File not found at {file_path}")
         return
-
-
 
     if extract_pe_info is None or extract_asm_features is None:
         print("Error: Extraction modules not available.")
@@ -74,7 +75,8 @@ def evaluate_file(file_path, detector):
     print(f"File: {os.path.basename(file_path)}")
     print(f"Hash: {pe_features['file_info']['sha256']}")
     status = "MALWARE" if res["is_malware"] else "BENIGN"
-    print(f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
+    print(
+        f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
     print("--------------------------------------------------")
     print("Details:")
     if res["details"]:
@@ -91,6 +93,7 @@ def evaluate_file(file_path, detector):
     else:
         print("  - None")
     print("==================================================")
+
 
 def evaluate_directory(dir_path, detector):
     if not os.path.exists(dir_path):
@@ -113,7 +116,7 @@ def evaluate_directory(dir_path, detector):
         return
 
     print(f"Found {len(executables)} executable files. Evaluating...")
-    
+
     malware_count = 0
     benign_count = 0
 
@@ -123,14 +126,15 @@ def evaluate_directory(dir_path, detector):
             continue
         asm_features = extract_asm_features(file_path)
         res = detector.detect(pe_features, asm_features)
-        
+
         status = "MALWARE" if res["is_malware"] else "BENIGN"
         if res["is_malware"]:
             malware_count += 1
         else:
             benign_count += 1
-        
-        print(f"[{status}] (Score: {res['score']}, Probability: {res['malware_probability']:.2f}%) {os.path.basename(file_path)}")
+
+        print(
+            f"[{status}] (Score: {res['score']}, Probability: {res['malware_probability']:.2f}%) {os.path.basename(file_path)}")
 
     print("==================================================")
     print("          DATASET EVALUATION REPORT               ")
@@ -139,6 +143,7 @@ def evaluate_directory(dir_path, detector):
     print(f"  Benign Detected      : {benign_count}")
     print(f"  Malware Detected     : {malware_count}")
     print("==================================================")
+
 
 def evaluate_random_sample(pe_path, asm_path, detector, label="MALWARE"):
     try:
@@ -165,7 +170,8 @@ def evaluate_random_sample(pe_path, asm_path, detector, label="MALWARE"):
     print(f"File: {data['pe']['file_info']['file_name']}")
     print(f"Hash: {h}")
     status = "MALWARE" if res["is_malware"] else "BENIGN"
-    print(f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
+    print(
+        f"Result: {status} (Score: {res['score']}/{detector.threshold}, Malware Probability: {res['malware_probability']:.2f}%)")
     print("--------------------------------------------------")
     print("Details:")
     if res["details"]:
@@ -183,11 +189,15 @@ def evaluate_random_sample(pe_path, asm_path, detector, label="MALWARE"):
         print("  - None")
     print("==================================================")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate malware files or datasets.")
-    parser.add_argument("path", nargs="?", default=None, help="Path to an executable file or a directory to evaluate statically.")
-    parser.add_argument("--random-malware", "-rm", action="store_true", help="Pick a random malware sample from the pre-extracted features and evaluate it.")
-    parser.add_argument("--random-benign", "-rb", action="store_true", help="Pick a random benign sample from the pre-extracted features and evaluate it.")
+    parser.add_argument("path", nargs="?", default=None,
+                        help="Path to an executable file or a directory to evaluate statically.")
+    parser.add_argument("--random-malware", "-rm", action="store_true",
+                        help="Pick a random malware sample from the pre-extracted features and evaluate it.")
+    parser.add_argument("--random-benign", "-rb", action="store_true",
+                        help="Pick a random benign sample from the pre-extracted features and evaluate it.")
     args = parser.parse_args()
 
     detector = MalwareDetector()
@@ -225,14 +235,16 @@ def main():
             tp += 1
         else:
             fn += 1
-            false_negatives.append((h, data["pe"]["file_info"]["file_name"], res["score"], res["details"], res["detected_behaviors"]))
+            false_negatives.append(
+                (h, data["pe"]["file_info"]["file_name"], res["score"], res["details"], res["detected_behaviors"]))
 
     # Evaluate Benign
     for h, data in benign_dataset.items():
         res = detector.detect(data["pe"], data["asm"])
         if res["is_malware"]:
             fp += 1
-            false_positives.append((h, data["pe"]["file_info"]["file_name"], res["score"], res["details"], res["detected_behaviors"]))
+            false_positives.append(
+                (h, data["pe"]["file_info"]["file_name"], res["score"], res["details"], res["detected_behaviors"]))
         else:
             tn += 1
 
@@ -275,6 +287,7 @@ def main():
             print(f"  Hash: {h} | Name: {name} | Score: {score}")
             print(f"    Details: {details}")
             print(f"    Behaviors: {behaviors}")
+
 
 if __name__ == "__main__":
     main()
