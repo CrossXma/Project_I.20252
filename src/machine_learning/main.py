@@ -59,7 +59,7 @@ def run_pipeline(model_name):
     print(f"STEP 3: EVALUATION ({model_name.upper()})")
     print("=" * 60)
 
-    evaluate(model_name)
+    evaluate(model_name, option="test")
 
     elapsed = time.time() - start_time
 
