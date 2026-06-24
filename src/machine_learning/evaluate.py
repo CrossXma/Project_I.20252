@@ -27,19 +27,19 @@ RESULT_DIR = "./output/results"
 # LOAD DATA
 # ==================================================
 
-def load_test_data():
+def load_test_data(option):
 
     X_test = pd.read_csv(
         os.path.join(
             DATASET_DIR,
-            "X_test.csv"
+            f"X_{option}.csv"
         )
     )
 
     y_test = pd.read_csv(
         os.path.join(
             DATASET_DIR,
-            "y_test.csv"
+            f"y_{option}.csv"
         )
     ).values.ravel()
 
@@ -74,13 +74,13 @@ def load_model(model_name):
 # EVALUATION
 # ==================================================
 
-def evaluate(model_name):
+def evaluate(model_name, option):
 
     print(
         f"[INFO] Evaluating {model_name}"
     )
 
-    X_test, y_test = load_test_data()
+    X_test, y_test = load_test_data(option=option)
 
     encoder = load_label_encoder()
 
@@ -186,7 +186,7 @@ def evaluate(model_name):
 
     metrics_path = os.path.join(
         RESULT_DIR,
-        f"{model_name}_metrics.txt"
+        f"{model_name}_metrics_{option}.txt"
     )
 
     with open(
@@ -247,8 +247,18 @@ if __name__ == "__main__":
         required=True
     )
 
+    parser.add_argument(
+        "--option",
+        choices=[
+            "test",
+            "predict"
+        ],
+        default="test"
+    )
+
     args = parser.parse_args()
 
     evaluate(
-        model_name=args.model
+        model_name=args.model,
+        option=args.option
     )

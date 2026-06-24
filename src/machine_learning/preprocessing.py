@@ -367,6 +367,16 @@ def preprocess(
         errors="ignore"
     )
 
+    feature_columns = list(X.columns)
+
+    joblib.dump(
+        feature_columns,
+        os.path.join(
+            output_dir,
+            "feature_columns.pkl"
+        )
+    )
+
     encoder = LabelEncoder()
 
     y_encoded = encoder.fit_transform(y)
@@ -435,6 +445,115 @@ def preprocess(
     )
 
     print("[INFO] Preprocessing complete.")
+
+def preprocess_predict(
+    benign_pe_path,
+    benign_asm_path,
+    malware_pe_path,
+    malware_asm_path,
+    output_dir
+):
+    
+    print("[INFO] Loading JSON files...")
+
+    benign_pe = load_json(
+        benign_pe_path
+    )
+
+    benign_asm = load_json(
+        benign_asm_path
+    )
+
+    malware_pe = load_json(
+        malware_pe_path
+    )
+
+    malware_asm = load_json(
+        malware_asm_path
+    )
+
+    rows = []
+
+    rows.extend(
+        build_dataset(
+            benign_pe,
+            benign_asm,
+            "benign"
+        )
+    )
+
+    rows.extend(
+        build_dataset(
+            malware_pe,
+            malware_asm,
+            "malware"
+        )
+    )
+
+    df = pd.DataFrame(rows)
+
+    print(
+        f"[INFO] Total samples: "
+        f"{len(df)}"
+    )
+
+    df.fillna(0, inplace=True)
+
+    # ------------------------------------------
+    # LABELS
+    # ------------------------------------------
+
+    feature_columns = joblib.load(
+        os.path.join(
+            OUTPUT_DIR,
+            "feature_columns.pkl"
+        )
+    )
+
+    y = df["label"]
+
+    X = df.drop(
+        columns=[
+            "label",
+            "sha256"
+        ],
+        errors="ignore"
+    )
+
+    for col in feature_columns:
+        if col not in X.columns:
+            X[col] = 0
+    
+    X = X[feature_columns]
+
+    encoder = joblib.load(
+        os.path.join(
+            OUTPUT_DIR,
+            "label_encoder.pkl"
+        )
+    )
+
+    y_encoded = encoder.transform(y)
+
+    # ------------------------------------------
+    # SAVE
+    # ------------------------------------------
+
+    X.to_csv(
+        os.path.join(
+            output_dir,
+            "X_predict.csv"
+        ),
+        index=False
+    )
+
+    pd.DataFrame(y_encoded).to_csv(
+        os.path.join(
+            output_dir,
+            "y_predict.csv"
+        ),
+        index=False
+    )
 
 
 # ==================================================
