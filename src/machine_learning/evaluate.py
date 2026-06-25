@@ -1,6 +1,7 @@
 import argparse
 import joblib
 import os
+import time
 
 import pandas as pd
 
@@ -71,6 +72,29 @@ def load_model(model_name):
 
 
 # ==================================================
+# Details
+# ==================================================
+def detailed_output(model_name, option, results_df, prediction_path):
+
+    # print("\n========== DETAILS ==========")
+    # print("=" * 80)
+
+    # for _, row in results_df.iterrows():
+
+    #     print(
+    #         f"{row['file_name'][:6]:<10}"
+    #         f"{row['sha256'][:6]:<10}"
+    #         f"{row['prediction']:<12}"
+    #         f"{row['confidence']:>7}%"
+    #     )
+
+    results_df.to_csv(
+        prediction_path,
+        index=False
+    )
+
+
+# ==================================================
 # EVALUATION
 # ==================================================
 
@@ -90,7 +114,11 @@ def evaluate(model_name, option):
     # Predictions
     # ------------------------------------------
 
+    start_time = time.time()
+
     y_pred = model.predict(X_test)
+
+    runtime = time.time() - start_time
 
     # ------------------------------------------
     # Metrics
@@ -119,6 +147,14 @@ def evaluate(model_name, option):
         average="weighted"
     )
 
+    probabilities = model.predict_proba(
+        X_test
+    )
+
+    confidence_scores = (
+        probabilities.max(axis=1)
+    )
+
     # ------------------------------------------
     # Human-readable labels
     # ------------------------------------------
@@ -143,6 +179,37 @@ def evaluate(model_name, option):
     cm = confusion_matrix(
         y_test_labels,
         y_pred_labels
+    )
+
+    metadata = pd.read_csv(
+        os.path.join(
+            DATASET_DIR,
+            f"{option}_metadata.csv"
+        )
+    )
+
+    results_df = pd.DataFrame({
+
+        "file_name":
+            metadata["file_name"],
+
+        "sha256":
+            metadata["sha256"],
+
+        "prediction":
+            y_pred_labels,
+
+        "confidence":
+            confidence_scores
+    })
+
+    results_df["confidence"] = (
+        results_df["confidence"] * 100
+    ).round(2)
+
+    prediction_path = os.path.join(
+        RESULT_DIR,
+        f"{model_name}_{option}_predictions.csv"
     )
 
     # ------------------------------------------
@@ -175,6 +242,8 @@ def evaluate(model_name, option):
 
     print(cm)
 
+    detailed_output(model_name, option, results_df, prediction_path)
+
     # ------------------------------------------
     # Save results
     # ------------------------------------------
@@ -194,6 +263,29 @@ def evaluate(model_name, option):
         "w",
         encoding="utf-8"
     ) as f:
+        
+        f.write("Prediction Runtime Metrics\n")
+        f.write("--------------------------\n")
+        
+        f.write(
+            f"Model: {model_name}\n"
+        )
+
+        f.write(
+            f"Samples: {len(results_df)}\n"
+        )
+
+        f.write(
+            f"Runtime: {runtime:.4f} seconds\n"
+        )
+
+        f.write(
+            f"Average per sample: "
+            f"{runtime / len(results_df):.6f} seconds\n"
+        )
+
+        f.write("\nClassification Metrics\n")
+        f.write("----------------------\n")
 
         f.write(
             f"Accuracy : {accuracy:.4f}\n"
@@ -228,6 +320,7 @@ def evaluate(model_name, option):
     )
 
     print(metrics_path)
+    print(prediction_path)
 
 
 # ==================================================

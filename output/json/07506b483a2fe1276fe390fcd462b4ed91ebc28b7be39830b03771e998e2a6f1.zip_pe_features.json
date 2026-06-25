@@ -1,0 +1,59 @@
+{
+    "07506b483a2fe1276fe390fcd462b4ed91ebc28b7be39830b03771e998e2a6f1": {
+        "file_info": {
+            "file_name": "07506b483a2fe1276fe390fcd462b4ed91ebc28b7be39830b03771e998e2a6f1.exe",
+            "file_size_bytes": 46080,
+            "md5": "95d1f3f551726758afefd7d77374ad68",
+            "sha1": "a292bcefc8f37a360ad7704077f8ecfa8a634300",
+            "sha256": "07506b483a2fe1276fe390fcd462b4ed91ebc28b7be39830b03771e998e2a6f1"
+        },
+        "headers": {
+            "machine": "IMAGE_FILE_MACHINE_I386",
+            "compile_time": "2026-04-12T14:08:41+00:00",
+            "entry_point": "0xc71e",
+            "image_base": "0x400000",
+            "number_of_sections": 3,
+            "subsystem": "IMAGE_SUBSYSTEM_WINDOWS_GUI",
+            "imphash": "f34d5f2d4577ed6d9ceec516c1f5a744"
+        },
+        "sections": [
+            {
+                "name": ".text",
+                "virtual_address": "0x2000",
+                "virtual_size": 42788,
+                "raw_size": 43008,
+                "entropy": 5.5004,
+                "characteristics": [
+                    "READ",
+                    "EXECUTE"
+                ]
+            },
+            {
+                "name": ".rsrc",
+                "virtual_address": "0xe000",
+                "virtual_size": 2020,
+                "raw_size": 2048,
+                "entropy": 4.8059,
+                "characteristics": [
+                    "READ"
+                ]
+            },
+            {
+                "name": ".reloc",
+                "virtual_address": "0x10000",
+                "virtual_size": 12,
+                "raw_size": 512,
+                "entropy": 0.0815,
+                "characteristics": [
+                    "READ"
+                ]
+            }
+        ],
+        "imports": {
+            "mscoree.dll": [
+                "_CorExeMain"
+            ]
+        },
+        "exports": []
+    }
+}

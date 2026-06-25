@@ -288,12 +288,38 @@ def build_dataset(
             asm_sample
         )
 
+        file_info = pe_sample.get(
+            "file_info",
+            {}
+        )
+
+        row["file_name"] = file_info.get(
+            "file_name",
+            "unknown"
+        )
         row["sha256"] = sha256
         row["label"] = label
 
         rows.append(row)
 
     return rows
+
+
+# ==================================================
+# METADATA
+# ==================================================
+
+def metadata_saving(df, output_dir, option):
+
+    metadata_df = df[["file_name", "sha256"]]
+
+    metadata_df.to_csv(
+        os.path.join(
+            output_dir,
+            f"{option}_metadata.csv"
+        ),
+        index=False
+    )
 
 
 # ==================================================
@@ -359,15 +385,16 @@ def preprocess(
 
     y = df["label"]
 
-    X = df.drop(
+    X = df
+
+    feature_columns = list(df.drop(
         columns=[
             "label",
-            "sha256"
+            "sha256",
+            "file_name"
         ],
         errors="ignore"
-    )
-
-    feature_columns = list(X.columns)
+    ).columns)
 
     joblib.dump(
         feature_columns,
@@ -400,12 +427,32 @@ def preprocess(
         exist_ok=True
     )
 
+    metadata_saving(X_test, output_dir, option="test")
+
+    X_train = X_train.drop(
+        columns=[
+            "label",
+            "sha256",
+            "file_name"
+        ],
+        errors="ignore"
+    )
+
     X_train.to_csv(
         os.path.join(
             output_dir,
             "X_train.csv"
         ),
         index=False
+    )
+
+    X_test = X_test.drop(
+        columns=[
+            "label",
+            "sha256",
+            "file_name"
+        ],
+        errors="ignore"
     )
 
     X_test.to_csv(
@@ -447,22 +494,12 @@ def preprocess(
     print("[INFO] Preprocessing complete.")
 
 def preprocess_predict(
-    benign_pe_path,
-    benign_asm_path,
     malware_pe_path,
     malware_asm_path,
     output_dir
 ):
     
     print("[INFO] Loading JSON files...")
-
-    benign_pe = load_json(
-        benign_pe_path
-    )
-
-    benign_asm = load_json(
-        benign_asm_path
-    )
 
     malware_pe = load_json(
         malware_pe_path
@@ -473,14 +510,6 @@ def preprocess_predict(
     )
 
     rows = []
-
-    rows.extend(
-        build_dataset(
-            benign_pe,
-            benign_asm,
-            "benign"
-        )
-    )
 
     rows.extend(
         build_dataset(
@@ -515,7 +544,8 @@ def preprocess_predict(
     X = df.drop(
         columns=[
             "label",
-            "sha256"
+            "sha256",
+            "file_name"
         ],
         errors="ignore"
     )
@@ -554,6 +584,8 @@ def preprocess_predict(
         ),
         index=False
     )
+
+    metadata_saving(df, output_dir, option="predict")
 
 
 # ==================================================

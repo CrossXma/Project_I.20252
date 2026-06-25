@@ -1,3 +1,11 @@
+Prediction Runtime Metrics
+--------------------------
+Model: xgb
+Samples: 360
+Runtime: 0.0120 seconds
+Average per sample: 0.000033 seconds
+Classification Metrics
+----------------------
 Accuracy : 0.9972
 Precision: 0.9972
 Recall   : 0.9972
