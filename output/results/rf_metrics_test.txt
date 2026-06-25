@@ -2,21 +2,21 @@ Prediction Runtime Metrics
 --------------------------
 Model: rf
 Samples: 360
-Runtime: 0.0394 seconds
+Runtime: 0.0396 seconds
 Average per sample: 0.000110 seconds
 
 Classification Metrics
 ----------------------
-Accuracy : 0.9944
-Precision: 0.9945
-Recall   : 0.9944
-F1 Score : 0.9944
+Accuracy : 0.9917
+Precision: 0.9917
+Recall   : 0.9917
+F1 Score : 0.9917
 
 Classification Report
               precision    recall  f1-score   support
 
-      benign       1.00      0.99      0.99       199
-     malware       0.99      1.00      0.99       161
+      benign       0.99      0.99      0.99       199
+     malware       0.99      0.99      0.99       161
 
     accuracy                           0.99       360
    macro avg       0.99      0.99      0.99       360
@@ -25,4 +25,4 @@ weighted avg       0.99      0.99      0.99       360
 
 Confusion Matrix
 [[197   2]
- [  0 161]]
+ [  1 160]]

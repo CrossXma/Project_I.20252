@@ -183,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         choices=["rf", "xgb"],
-        default="xgb",
+        required=True,
         help="Machine learning model"
     )
 
